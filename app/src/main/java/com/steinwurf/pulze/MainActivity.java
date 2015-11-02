@@ -28,7 +28,6 @@ import java.net.UnknownHostException;
 public class MainActivity extends AppCompatActivity {
 
     private static final int PORT = 51423;
-    private static final int KEEP_ALIVE_INTERVAL = 100;
     private static final String TAG = "MainActivity";
     RelativeLayout mScreen;
     WifiManager mWifi;
@@ -36,8 +35,9 @@ public class MainActivity extends AppCompatActivity {
     private WifiManager.WifiLock mWifiLock;
     private KeepAliveThread mKeepAliveThread;
     private TextView mLastPacketText;
+    private TextView mLostPacketsText;
     private TextView mPacketCountText;
-
+    private TextView mKeepAliveText;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -47,7 +47,9 @@ public class MainActivity extends AppCompatActivity {
         mWifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         mWifiLock = mWifi.createWifiLock("WakeLockPulze");
         mLastPacketText = (TextView)findViewById(R.id.last_packet);
+        mLostPacketsText = (TextView)findViewById(R.id.lost_packets);
         mPacketCountText = (TextView)findViewById(R.id.packet_count);
+        mKeepAliveText = (TextView)findViewById(R.id.keep_alive);
 
         mWifiLock.acquire();
         mReceiverThread = new ReceiverThread();
@@ -87,9 +89,15 @@ public class MainActivity extends AppCompatActivity {
         private int mInterval;
         private boolean mTransmit = true;
 
-        public KeepAliveThread(String address, int interval)
+        public KeepAliveThread(String address, final int interval)
         {
             mInterval = interval;
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    mKeepAliveText.setText("" + interval);
+                }
+            });
             mAddress = address;
         }
 
@@ -127,10 +135,41 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private class Packet {
+
+        public static final int LENGTH = 22;
+        public boolean mValid = false;
+        public int mPacketNumber;
+        public int mSendInterval;
+        public int mKeepAliveInterval;
+
+        Packet(byte[] buffer)
+        {
+            String result = new String(buffer);
+            if (result.length() != LENGTH) {
+                Log.d(TAG, "result.length() != LENGTH");
+                return;
+            }
+
+            final String[] results = result.split(",");
+
+            if (results.length != 3) {
+                Log.d(TAG, "results.length != 3");
+                return;
+            }
+
+            mPacketNumber = Integer.parseInt(results[0]);
+            mSendInterval = Integer.parseInt(results[1]);
+            mKeepAliveInterval = Integer.parseInt(results[2]);
+            mValid = true;
+        }
+    }
     private class ReceiverThread extends Thread {
 
         private boolean mTransmit = true;
         private int mPacketCount = 0;
+        private int mLastPacket = 0;
+        private int mLostPackets = 0;
 
         @Override
         public void run() {
@@ -142,27 +181,50 @@ public class MainActivity extends AppCompatActivity {
 
                 try {
                     while (mTransmit) {
-                        byte[] buffer = new byte[16];
+                        byte[] buffer = new byte[Packet.LENGTH];
                         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                         socket.receive(packet);
+
+                        final Packet p = new Packet(buffer);
+                        if (!p.mValid) {
+                            Log.w(TAG, "Got bogus message");
+                            continue;
+                        }
+
+                        if (mKeepAliveThread != null && mKeepAliveThread.mInterval != p.mKeepAliveInterval) {
+                            mKeepAliveThread.stopTransmission();
+                            try {
+                                mKeepAliveThread.join();
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                            mKeepAliveThread = null;
+                        }
+
                         if (mKeepAliveThread == null) {
-                            Log.d(TAG, "Setting keep alive address: " + packet.getAddress().getHostAddress());
-                            mKeepAliveThread = new KeepAliveThread(packet.getAddress().getHostAddress(), KEEP_ALIVE_INTERVAL);
+
+                            mKeepAliveThread = new KeepAliveThread(
+                                    packet.getAddress().getHostAddress(), p.mKeepAliveInterval);
                             mKeepAliveThread.start();
                         }
-                        String result = new String(buffer);
 
-                        final String[] results = result.split(",");
-                        final int packetNumber = Integer.parseInt(results[1]);
+                        if (mLastPacket > p.mPacketNumber) {
+                            mLastPacket = 0;
+                        }
+
+                        if (mLastPacket != 0) {
+                            mLostPackets += (p.mPacketNumber - mLastPacket) - 1;
+                        }
+                        mLastPacket = p.mPacketNumber;
+
                         mPacketCount += 1;
-
-                        Log.d(TAG, "packet " + packetNumber);
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                resetAnimation(Integer.parseInt(results[0]));
-                                mLastPacketText.setText("" + packetNumber);
+                                resetAnimation(p.mSendInterval);
+                                mLastPacketText.setText("" + p.mPacketNumber);
                                 mPacketCountText.setText("" + mPacketCount);
+                                mLostPacketsText.setText("" + mLostPackets);
                             }
                         });
                     }

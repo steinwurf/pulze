@@ -43,14 +43,36 @@
                 android:textStyle="bold"
                 android:textSize="30dp" />
         </LinearLayout>
-
         <LinearLayout
             android:orientation="horizontal"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_centerVertical="true"
-            android:layout_centerHorizontal="true"
-            android:id="@+id/linearLayout">
+            android:layout_centerHorizontal="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Lost Packets: "
+                android:textColor="#ffffff"
+                android:textStyle="bold"
+                android:textSize="30dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:id="@+id/lost_packets"
+                android:textColor="#ffffff"
+                android:textStyle="bold"
+                android:textSize="30dp" />
+        </LinearLayout>
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_centerHorizontal="true">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -65,6 +87,30 @@
                 android:layout_height="wrap_content"
                 android:text="0"
                 android:id="@+id/last_packet"
+                android:textColor="#ffffff"
+                android:textStyle="bold"
+                android:textSize="30dp" />
+        </LinearLayout>
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_centerHorizontal="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Keep Alive Interval: "
+                android:textColor="#ffffff"
+                android:textStyle="bold"
+                android:textSize="30dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:id="@+id/keep_alive"
                 android:textColor="#ffffff"
                 android:textStyle="bold"
                 android:textSize="30dp" />
