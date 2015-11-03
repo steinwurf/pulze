@@ -38,6 +38,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView mLostPacketsText;
     private TextView mPacketCountText;
     private TextView mKeepAliveText;
+    private ObjectAnimator mColorFade;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -250,18 +252,20 @@ public class MainActivity extends AppCompatActivity {
     public void resetAnimation(int delay)
     {
         mScreen.setBackgroundColor(Color.rgb(0,255,0));
+        if (mColorFade != null)
+        {
+            mColorFade.cancel();
+        }
 
-        ObjectAnimator colorFade = ObjectAnimator.ofObject(
+        mColorFade = ObjectAnimator.ofObject(
                 mScreen,
                 "backgroundColor",
                 new ArgbEvaluator(),
                 0xff00ff00,
                 0xffff0000);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-            colorFade.setAutoCancel(true);
-        }
-        colorFade.setStartDelay(delay);
-        colorFade.setDuration(delay);
-        colorFade.start();
+
+        mColorFade .setStartDelay(delay);
+        mColorFade .setDuration(delay);
+        mColorFade .start();
     }
 }
