@@ -39,6 +39,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView mPacketCountText;
     private TextView mKeepAliveText;
     private ObjectAnimator mColorFade;
+    private Thread mFadeThread;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -249,23 +250,83 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void resetAnimation(int delay)
-    {
-        mScreen.setBackgroundColor(Color.rgb(0,255,0));
-        if (mColorFade != null)
-        {
-            mColorFade.cancel();
+    public static Object evaluate(float fraction, Object startValue, Object endValue) {
+        int startInt = (Integer) startValue;
+        int startA = (startInt >> 24) & 0xff;
+        int startR = (startInt >> 16) & 0xff;
+        int startG = (startInt >> 8) & 0xff;
+        int startB = startInt & 0xff;
+
+        int endInt = (Integer) endValue;
+        int endA = (endInt >> 24) & 0xff;
+        int endR = (endInt >> 16) & 0xff;
+        int endG = (endInt >> 8) & 0xff;
+        int endB = endInt & 0xff;
+
+        return (int)((startA + (int)(fraction * (endA - startA))) << 24) |
+                (int)((startR + (int)(fraction * (endR - startR))) << 16) |
+                (int)((startG + (int)(fraction * (endG - startG))) << 8) |
+                (int)((startB + (int)(fraction * (endB - startB))));
+    }
+
+    public void resetAnimation(final int delay) {
+        mScreen.setBackgroundColor(Color.rgb(0, 255, 0));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
+            if (mColorFade != null) {
+                mColorFade.cancel();
+            }
+
+            mColorFade = ObjectAnimator.ofObject(
+                    mScreen,
+                    "backgroundColor",
+                    new ArgbEvaluator(),
+                    0xff00ff00,
+                    0xffff0000);
+
+            mColorFade.setStartDelay(delay);
+            mColorFade.setDuration(delay);
+            mColorFade.start();
         }
+        else
+        {
+            if (mFadeThread != null) {
+                mFadeThread.interrupt();
+                try {
+                    mFadeThread.join();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+            mFadeThread = new Thread(){
 
-        mColorFade = ObjectAnimator.ofObject(
-                mScreen,
-                "backgroundColor",
-                new ArgbEvaluator(),
-                0xff00ff00,
-                0xffff0000);
+                int mI;
 
-        mColorFade .setStartDelay(delay);
-        mColorFade .setDuration(delay);
-        mColorFade .start();
+                @Override
+                public void run(){
+
+                    try {
+                        sleep(delay);
+
+                        for(mI=0; mI<delay; mI++) {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    int color = (int) evaluate(
+                                            (float)mI / (float)delay,
+                                            Color.argb(255, 0, 255, 0),
+                                            Color.argb(255, 255, 0, 0));
+
+                                    mScreen.setBackgroundColor(color);
+                                }
+                            });
+                            sleep(1);
+                        }
+                    } catch (InterruptedException e) {
+                    }
+                }
+            };
+
+            mFadeThread.start();
+        }
     }
 }
