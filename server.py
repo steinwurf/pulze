@@ -59,9 +59,9 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval):
     try:
         packet = 0
         while True:
-            time.sleep(send_interval / 1000.0)
+            if send_interval:
+                time.sleep(send_interval / 1000.0)
             packet += 1
-
             data = "{:010d},{:05d},{:05d}".format(
                 packet,
                 send_interval,

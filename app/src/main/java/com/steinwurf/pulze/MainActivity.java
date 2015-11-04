@@ -32,7 +32,6 @@ public class MainActivity extends AppCompatActivity {
     RelativeLayout mScreen;
     WifiManager mWifi;
     private ReceiverThread mReceiverThread;
-    private WifiManager.WifiLock mWifiLock;
     private KeepAliveThread mKeepAliveThread;
     private TextView mLastPacketText;
     private TextView mLostPacketsText;
@@ -44,17 +43,16 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d(TAG, "onCreate");
         setContentView(R.layout.activity_main);
         mScreen = (RelativeLayout)findViewById(R.id.screen);
         mScreen.setBackgroundColor(Color.rgb(255, 0, 0));
         mWifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-        mWifiLock = mWifi.createWifiLock("WakeLockPulze");
         mLastPacketText = (TextView)findViewById(R.id.last_packet);
         mLostPacketsText = (TextView)findViewById(R.id.lost_packets);
         mPacketCountText = (TextView)findViewById(R.id.packet_count);
         mKeepAliveText = (TextView)findViewById(R.id.keep_alive);
 
-        mWifiLock.acquire();
         mReceiverThread = new ReceiverThread();
         mReceiverThread.start();
     }
@@ -62,7 +60,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStop() {
         super.onStop();
-        mWifiLock.release();
+        Log.d(TAG, "onStop");
         Log.d(TAG, "Stopping Receiver Thread");
         if (mReceiverThread != null) {
             mReceiverThread.stopTransmission();
@@ -95,12 +93,6 @@ public class MainActivity extends AppCompatActivity {
         public KeepAliveThread(String address, final int interval)
         {
             mInterval = interval;
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    mKeepAliveText.setText("" + interval);
-                }
-            });
             mAddress = address;
         }
 
@@ -160,13 +152,18 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "results.length != 3");
                 return;
             }
-
-            mPacketNumber = Integer.parseInt(results[0]);
-            mSendInterval = Integer.parseInt(results[1]);
-            mKeepAliveInterval = Integer.parseInt(results[2]);
+            try {
+                mPacketNumber = Integer.parseInt(results[0]);
+                mSendInterval = Integer.parseInt(results[1]);
+                mKeepAliveInterval = Integer.parseInt(results[2]);
+            } catch (NumberFormatException e) {
+                e.printStackTrace();
+                return;
+            }
             mValid = true;
         }
     }
+
     private class ReceiverThread extends Thread {
 
         private boolean mTransmit = true;
@@ -190,10 +187,17 @@ public class MainActivity extends AppCompatActivity {
 
                         final Packet p = new Packet(buffer);
                         if (!p.mValid) {
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    mScreen.setBackgroundColor(Color.rgb(255, 255, 0));
+                                }
+                            });
                             Log.w(TAG, "Got bogus message");
                             continue;
                         }
 
+                        // Handle keep alive
                         if (mKeepAliveThread != null && mKeepAliveThread.mInterval != p.mKeepAliveInterval) {
                             mKeepAliveThread.stopTransmission();
                             try {
@@ -202,17 +206,32 @@ public class MainActivity extends AppCompatActivity {
                                 e.printStackTrace();
                             }
                             mKeepAliveThread = null;
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    mKeepAliveText.setText("");
+                                }
+                            });
                         }
 
-                        if (mKeepAliveThread == null) {
+                        if (mKeepAliveThread == null && p.mKeepAliveInterval != 0) {
 
+                            runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    mKeepAliveText.setText("" + p.mKeepAliveInterval);
+                                }
+                            });
                             mKeepAliveThread = new KeepAliveThread(
                                     packet.getAddress().getHostAddress(), p.mKeepAliveInterval);
                             mKeepAliveThread.start();
                         }
 
+                        // We got a sequence number below that of the previous - reset!
                         if (mLastPacket > p.mPacketNumber) {
                             mLastPacket = 0;
+                            mLostPackets = 0;
+                            mPacketCount = 0;
                         }
 
                         if (mLastPacket != 0) {
@@ -250,23 +269,22 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public static Object evaluate(float fraction, Object startValue, Object endValue) {
-        int startInt = (Integer) startValue;
-        int startA = (startInt >> 24) & 0xff;
-        int startR = (startInt >> 16) & 0xff;
-        int startG = (startInt >> 8) & 0xff;
-        int startB = startInt & 0xff;
+    // Copied from ArgbEvaluator, which is only available on newer devices.
+    public static Object evaluate(float fraction, int start, int end) {
+        int startA = (start >> 24) & 0xff;
+        int startR = (start >> 16) & 0xff;
+        int startG = (start >> 8) & 0xff;
+        int startB = start & 0xff;
 
-        int endInt = (Integer) endValue;
-        int endA = (endInt >> 24) & 0xff;
-        int endR = (endInt >> 16) & 0xff;
-        int endG = (endInt >> 8) & 0xff;
-        int endB = endInt & 0xff;
+        int endA = (end >> 24) & 0xff;
+        int endR = (end >> 16) & 0xff;
+        int endG = (end >> 8) & 0xff;
+        int endB = end & 0xff;
 
         return (int)((startA + (int)(fraction * (endA - startA))) << 24) |
-                (int)((startR + (int)(fraction * (endR - startR))) << 16) |
-                (int)((startG + (int)(fraction * (endG - startG))) << 8) |
-                (int)((startB + (int)(fraction * (endB - startB))));
+               (int)((startR + (int)(fraction * (endR - startR))) << 16) |
+               (int)((startG + (int)(fraction * (endG - startG))) << 8) |
+               (int)((startB + (int)(fraction * (endB - startB))));
     }
 
     public void resetAnimation(final int delay) {
@@ -297,30 +315,42 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
             }
-            mFadeThread = new Thread(){
 
-                int mI;
+            mFadeThread = new Thread() {
+
+                private int mI;
 
                 @Override
                 public void run(){
 
                     try {
-                        sleep(delay);
 
-                        for(mI=0; mI<delay; mI++) {
+                        sleep((int)(delay * 1.5));
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                mScreen.setBackgroundColor(Color.rgb(255, 0, 0));
+                            }
+                        });
+                        // We don't fade the backround on older devices. The reason for this is
+                        // that the fading is too slow if the delay is too low, meaning the devices
+                        // will start to flicker even though all packets are received.
+                        /*
+                        sleep(delay);
+                        for(mI = 0; mI < delay; mI += 2) {
                             runOnUiThread(new Runnable() {
                                 @Override
                                 public void run() {
                                     int color = (int) evaluate(
                                             (float)mI / (float)delay,
-                                            Color.argb(255, 0, 255, 0),
-                                            Color.argb(255, 255, 0, 0));
-
+                                            Color.rgb(0, 255, 0),
+                                            Color.rgb(255, 0, 0));
                                     mScreen.setBackgroundColor(color);
                                 }
                             });
                             sleep(1);
                         }
+                        */
                     } catch (InterruptedException e) {
                     }
                 }
@@ -330,3 +360,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 }
+                        // though they are receiving all packets.
+                        // long if the delay is too short. This causes the devices to flicker even
+                        // We don't fade the background on older devices, as it seems to take too
+
