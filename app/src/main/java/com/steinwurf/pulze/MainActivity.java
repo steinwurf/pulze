@@ -132,30 +132,32 @@ public class MainActivity extends AppCompatActivity {
 
     private class Packet {
 
-        public static final int LENGTH = 22;
+        public static final int MIN_LENGTH = 23;
+        public static final int MAX_LENGTH = 1400;
         public boolean mValid = false;
         public int mPacketNumber;
         public int mSendInterval;
         public int mKeepAliveInterval;
 
-        Packet(byte[] buffer)
+        Packet(DatagramPacket packet)
         {
-            String result = new String(buffer);
-            if (result.length() != LENGTH) {
-                Log.d(TAG, "result.length() != LENGTH");
+            String result = new String(packet.getData(), 0, packet.getLength());
+            if (result.length() < MIN_LENGTH) {
+                Log.d(TAG, "result.length() < MIN_LENGTH");
                 return;
             }
 
             final String[] results = result.split(",");
 
-            if (results.length != 3) {
-                Log.d(TAG, "results.length != 3");
+            if (results.length != 4) {
+                Log.d(TAG, "results.length != 4");
                 return;
             }
             try {
                 mPacketNumber = Integer.parseInt(results[0]);
                 mSendInterval = Integer.parseInt(results[1]);
                 mKeepAliveInterval = Integer.parseInt(results[2]);
+                // payload is in results[3] and is ignored
             } catch (NumberFormatException e) {
                 e.printStackTrace();
                 return;
@@ -181,11 +183,11 @@ public class MainActivity extends AppCompatActivity {
 
                 try {
                     while (mTransmit) {
-                        byte[] buffer = new byte[Packet.LENGTH];
+                        byte[] buffer = new byte[Packet.MAX_LENGTH];
                         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                         socket.receive(packet);
 
-                        final Packet p = new Packet(buffer);
+                        final Packet p = new Packet(packet);
                         if (!p.mValid) {
                             runOnUiThread(new Runnable() {
                                 @Override
@@ -363,4 +365,3 @@ public class MainActivity extends AppCompatActivity {
                         // though they are receiving all packets.
                         // long if the delay is too short. This causes the devices to flicker even
                         // We don't fade the background on older devices, as it seems to take too
-

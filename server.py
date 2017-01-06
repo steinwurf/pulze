@@ -10,6 +10,8 @@ import time
 PORT = 51423
 DEFAULT_SEND_INTERVAL = 1000
 DEFAULT_KEEP_ALIVE_INTERVAL = 100
+DEFAULT_PAYLOAD_SIZE = 0
+PACKET_FORMAT = "{packet:010d},{send_interval:05d},{keep_alive:05d},{payload}"
 
 
 def all_interfaces():
@@ -42,7 +44,8 @@ def format_ip(addr):
         str(ord(addr[3]))
 
 
-def transmit(interface_ip, port, send_interval, client_keep_alive_interval):
+def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
+             payload_size):
     """Transmit data."""
     print("Transmitting data every {send_interval}ms, "
           "to port {port}".format(
@@ -56,19 +59,22 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval):
     broadcast_ip = '.'.join(interface_ip.split('.')[:-1] + ['255'])
     print broadcast_ip
     address = (broadcast_ip, port)
+    payload = "X" * payload_size
     try:
         packet = 0
         while True:
             if send_interval:
                 time.sleep(send_interval / 1000.0)
             packet += 1
-            data = "{:010d},{:05d},{:05d}".format(
-                packet,
-                send_interval,
-                client_keep_alive_interval)
+            data = PACKET_FORMAT.format(
+                packet=packet,
+                send_interval=send_interval,
+                keep_alive=client_keep_alive_interval,
+                payload=payload)
             # Don't print if the interval is too low.
             if not send_interval <= 10:
-                print("sending {}".format(data))
+                print("sending {}... with length {}".format(data[:26],
+                                                            len(data)))
             sock.sendto(data, address)
     except:
         print("Stopping")
@@ -105,12 +111,21 @@ def main():
         help='The interval in which the clients sends keep alive data (ms).',
         type=int,
         default=DEFAULT_KEEP_ALIVE_INTERVAL)
+
+    parser.add_argument(
+        '--payload-size',
+        help='The size of the payload appended to the packets (bytes).',
+        type=int,
+        default=DEFAULT_PAYLOAD_SIZE)
+
+
     args = parser.parse_args()
     transmit(
         interfaces[args.interface],
         args.port,
         args.send_interval,
-        args.keep_alive_interval)
+        args.keep_alive_interval,
+        args.payload_size)
 
 if __name__ == '__main__':
     main()
