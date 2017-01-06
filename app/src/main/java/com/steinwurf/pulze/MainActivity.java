@@ -139,9 +139,9 @@ public class MainActivity extends AppCompatActivity {
         public int mSendInterval;
         public int mKeepAliveInterval;
 
-        Packet(DatagramPacket packet)
+        Packet(byte[] buffer)
         {
-            String result = new String(packet.getData(), 0, packet.getLength());
+            String result = new String(buffer);
             if (result.length() < MIN_LENGTH) {
                 Log.d(TAG, "result.length() < MIN_LENGTH");
                 return;
@@ -187,7 +187,7 @@ public class MainActivity extends AppCompatActivity {
                         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                         socket.receive(packet);
 
-                        final Packet p = new Packet(packet);
+                        final Packet p = new Packet(buffer);
                         if (!p.mValid) {
                             runOnUiThread(new Runnable() {
                                 @Override
