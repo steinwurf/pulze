@@ -170,8 +170,11 @@ public class MainActivity extends AppCompatActivity {
 
         private boolean mTransmit = true;
         private int mPacketCount = 0;
-        private int mLastPacket = 0;
+        private int mFirstPacketNumber = 0;
         private int mLostPackets = 0;
+        private int mLastPacket = 0;
+
+        private int mRemotePort = 0;
 
         @Override
         public void run() {
@@ -186,6 +189,14 @@ public class MainActivity extends AppCompatActivity {
                         byte[] buffer = new byte[Packet.MAX_LENGTH];
                         DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
                         socket.receive(packet);
+
+                        // If the port from which the packet was received is
+                        // new - new sender - reset
+                        if (packet.getPort() != mRemotePort) {
+                            mRemotePort = packet.getPort();
+                            mPacketCount = 0;
+                            mFirstPacketNumber = 0;
+                        }
 
                         final Packet p = new Packet(buffer);
                         if (!p.mValid) {
@@ -229,23 +240,26 @@ public class MainActivity extends AppCompatActivity {
                             mKeepAliveThread.start();
                         }
 
-                        // We got a sequence number below that of the previous - reset!
-                        if (mLastPacket > p.mPacketNumber) {
-                            mLastPacket = 0;
-                            mLostPackets = 0;
-                            mPacketCount = 0;
+                        if (mPacketCount == 0) {
+                            mFirstPacketNumber = p.mPacketNumber;
                         }
-
-                        if (mLastPacket != 0) {
-                            mLostPackets += (p.mPacketNumber - mLastPacket) - 1;
-                        }
-                        mLastPacket = p.mPacketNumber;
 
                         mPacketCount += 1;
+
+                        mLostPackets = (1 + p.mPacketNumber -
+                                        mFirstPacketNumber) - mPacketCount;
+
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                resetAnimation(p.mSendInterval);
+
+                                // Set minimum value to the display animation
+                                int displayInterval = p.mSendInterval;
+                                if (displayInterval < 100) {
+                                    displayInterval = 100;
+                                }
+
+                                resetAnimation(displayInterval);
                                 mLastPacketText.setText("" + p.mPacketNumber);
                                 mPacketCountText.setText("" + mPacketCount);
                                 mLostPacketsText.setText("" + mLostPackets);
