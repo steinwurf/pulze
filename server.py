@@ -76,7 +76,7 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
                 send_interval=send_interval,
                 keep_alive=client_keep_alive_interval,
                 payload=payload)
-            # Don't print if the interval is too lowself.
+
             bytes_sent += len(data)
             send_rate = (bytes_sent * 8 / (time.time() - time_start)) / 10**6
 
