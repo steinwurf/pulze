@@ -5,6 +5,7 @@ import fcntl
 import socket
 import struct
 import time
+import sys
 
 # Constants
 PORT = 51423
@@ -60,6 +61,10 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
     print broadcast_ip
     address = (broadcast_ip, port)
     payload = "X" * payload_size
+
+    bytes_sent = 0
+    time_start = time.time()
+
     try:
         packet = 0
         while True:
@@ -71,13 +76,24 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
                 send_interval=send_interval,
                 keep_alive=client_keep_alive_interval,
                 payload=payload)
-            # Don't print if the interval is too low.
-            if not send_interval <= 10:
-                print("sending {}... with length {}".format(data[:26],
-                                                            len(data)))
+            # Don't print if the interval is too lowself.
+            bytes_sent += len(data)
+            send_rate = (bytes_sent * 8 / (time.time() - time_start)) / 10**6
+
+            # For high send rate (low send intervals), only print sometimes
+            if send_interval <= 100 and packet % (100 / send_interval):
+                continue
+
+            sys.stdout.write("\rSent {}... with length {}. "
+                  "Data rate is {} Mbps".format(data[:26],
+                                                len(data),
+                                                send_rate))
+            sys.stdout.flush()
+
             sock.sendto(data, address)
-    except:
-        print("Stopping")
+    except KeyboardInterrupt:
+        print("\nStopping")
+    finally:
         sock.close()
 
 
