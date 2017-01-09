@@ -64,12 +64,17 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
 
     bytes_sent = 0
     time_start = time.time()
+    time_last = time_start
 
     try:
         packet = 0
         while True:
             if send_interval:
-                time.sleep(send_interval / 1000.0)
+                time_next = time_last + (send_interval / 1000.0)
+                sleeptime = time_next - time.time()
+                if(sleeptime > 0):
+                    time.sleep(sleeptime)
+                time_last = time_next
             packet += 1
             data = PACKET_FORMAT.format(
                 packet=packet,
