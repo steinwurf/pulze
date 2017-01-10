@@ -85,6 +85,8 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
             bytes_sent += len(data)
             send_rate = (bytes_sent * 8 / (time.time() - time_start)) / 10**6
 
+            sock.sendto(data, address)
+
             # For high send rate (low send intervals), only print sometimes
             if send_interval <= 100 and packet % (100 / send_interval):
                 continue
@@ -95,7 +97,6 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
                                                 send_rate))
             sys.stdout.flush()
 
-            sock.sendto(data, address)
     except KeyboardInterrupt:
         print("\nStopping")
     finally:

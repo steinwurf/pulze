@@ -8,6 +8,7 @@ import android.net.DhcpInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Handler;
+import android.support.annotation.FloatRange;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -35,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
     private KeepAliveThread mKeepAliveThread;
     private TextView mLastPacketText;
     private TextView mLostPacketsText;
+    private TextView mPacketLossText;
     private TextView mPacketCountText;
     private TextView mKeepAliveText;
     private ObjectAnimator mColorFade;
@@ -50,6 +52,7 @@ public class MainActivity extends AppCompatActivity {
         mWifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         mLastPacketText = (TextView)findViewById(R.id.last_packet);
         mLostPacketsText = (TextView)findViewById(R.id.lost_packets);
+        mPacketLossText = (TextView)findViewById(R.id.packet_loss);
         mPacketCountText = (TextView)findViewById(R.id.packet_count);
         mKeepAliveText = (TextView)findViewById(R.id.keep_alive);
 
@@ -172,6 +175,7 @@ public class MainActivity extends AppCompatActivity {
         private int mPacketCount = 0;
         private int mFirstPacketNumber = 0;
         private int mLostPackets = 0;
+        private double mPacketLoss = 0.0;
         private int mLastPacket = 0;
 
         private int mRemotePort = 0;
@@ -249,6 +253,7 @@ public class MainActivity extends AppCompatActivity {
                         mLostPackets = (1 + p.mPacketNumber -
                                         mFirstPacketNumber) - mPacketCount;
 
+                        mPacketLoss = (double) mLostPackets / (double) p.mPacketNumber * 100.0;
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
@@ -263,6 +268,7 @@ public class MainActivity extends AppCompatActivity {
                                 mLastPacketText.setText("" + p.mPacketNumber);
                                 mPacketCountText.setText("" + mPacketCount);
                                 mLostPacketsText.setText("" + mLostPackets);
+                                mPacketLossText.setText(String.format("%.2f", mPacketLoss) + " %");
                             }
                         });
                     }
