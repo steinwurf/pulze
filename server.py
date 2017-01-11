@@ -12,7 +12,7 @@ PORT = 51423
 DEFAULT_SEND_INTERVAL = 1000
 DEFAULT_KEEP_ALIVE_INTERVAL = 100
 DEFAULT_PAYLOAD_SIZE = 0
-PACKET_FORMAT = "{packet:010d},{send_interval:05d},{keep_alive:05d},{payload}"
+PACKET_FORMAT = "{packet:010d},{int_send_interval:05d},{keep_alive:05d},{payload}"
 
 
 def all_interfaces():
@@ -78,7 +78,7 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
             packet += 1
             data = PACKET_FORMAT.format(
                 packet=packet,
-                send_interval=send_interval,
+                int_send_interval=int(send_interval),
                 keep_alive=client_keep_alive_interval,
                 payload=payload)
 
@@ -88,7 +88,7 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
             sock.sendto(data, address)
 
             # For high send rate (low send intervals), only print sometimes
-            if send_interval <= 100 and packet % (100 / send_interval):
+            if send_interval < 100.0 and packet % int(100.0/send_interval):
                 continue
 
             sys.stdout.write("\rSent {}... with length {}. "
@@ -125,7 +125,7 @@ def main():
     parser.add_argument(
         '--send-interval',
         help='The transmit interval (ms).',
-        type=int,
+        type=float,
         default=DEFAULT_SEND_INTERVAL)
 
     parser.add_argument(
