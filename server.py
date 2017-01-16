@@ -57,9 +57,11 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
     sock.bind((interface_ip, 0))
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    broadcast_ip = '.'.join(interface_ip.split('.')[:-1] + ['255'])
-    print broadcast_ip
-    address = (broadcast_ip, port)
+    # broadcast_ip = '.'.join(interface_ip.split('.')[:-1] + ['255'])
+    # print broadcast_ip
+    # address = (broadcast_ip, port)
+    mcaddress = "224.0.0.251"
+    address = (mcaddress, port)
     payload = "X" * payload_size
 
     bytes_sent = 0

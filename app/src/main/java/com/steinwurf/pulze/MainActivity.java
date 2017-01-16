@@ -22,6 +22,7 @@ import android.widget.TextView;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.MulticastSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
@@ -29,6 +30,7 @@ import java.net.UnknownHostException;
 public class MainActivity extends AppCompatActivity {
 
     private static final int PORT = 51423;
+    private static final String GROUPNAME = "224.0.0.251";
     private static final String TAG = "MainActivity";
     RelativeLayout mScreen;
     WifiManager mWifi;
@@ -55,6 +57,11 @@ public class MainActivity extends AppCompatActivity {
         mPacketLossText = (TextView)findViewById(R.id.packet_loss);
         mPacketCountText = (TextView)findViewById(R.id.packet_count);
         mKeepAliveText = (TextView)findViewById(R.id.keep_alive);
+
+        if (mWifi != null){
+            WifiManager.MulticastLock lock = mWifi.createMulticastLock("mylock");
+            lock.acquire();
+        }
 
         mReceiverThread = new ReceiverThread();
         mReceiverThread.start();
@@ -182,11 +189,12 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void run() {
-            DatagramSocket socket = null;
+            MulticastSocket socket = null;
             try {
-                socket = new DatagramSocket(PORT);
+                socket = new MulticastSocket(PORT);
                 socket.setReuseAddress(true);
                 socket.setBroadcast(true);
+                socket.joinGroup(InetAddress.getByName(GROUPNAME));
 
                 try {
                     while (mTransmit) {
@@ -277,6 +285,8 @@ public class MainActivity extends AppCompatActivity {
                 }
 
             } catch (SocketException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
                 e.printStackTrace();
             } finally {
                 if (socket != null) {
