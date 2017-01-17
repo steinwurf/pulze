@@ -26,6 +26,7 @@ import java.net.MulticastSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -143,7 +144,7 @@ public class MainActivity extends AppCompatActivity {
     private class Packet {
 
         public static final int MIN_LENGTH = 23;
-        public static final int MAX_LENGTH = 1400;
+        public static final int MAX_LENGTH = 2000;
         public boolean mValid = false;
         public int mPacketNumber;
         public int mSendInterval;
@@ -151,27 +152,17 @@ public class MainActivity extends AppCompatActivity {
 
         Packet(byte[] buffer)
         {
-            String result = new String(buffer);
-            if (result.length() < MIN_LENGTH) {
-                Log.d(TAG, "result.length() < MIN_LENGTH");
-                return;
-            }
+            ByteBuffer wrapped = ByteBuffer.wrap(buffer);
 
-            final String[] results = result.split(",");
-
-            if (results.length != 4) {
-                Log.d(TAG, "results.length != 4");
-                return;
-            }
             try {
-                mPacketNumber = Integer.parseInt(results[0]);
-                mSendInterval = Integer.parseInt(results[1]);
-                mKeepAliveInterval = Integer.parseInt(results[2]);
-                // payload is in results[3] and is ignored
-            } catch (NumberFormatException e) {
+                mPacketNumber = wrapped.getInt(0);
+                mSendInterval = wrapped.getInt(4);
+                mKeepAliveInterval = wrapped.getInt(8);
+            } catch (IndexOutOfBoundsException e) {
                 e.printStackTrace();
                 return;
             }
+
             mValid = true;
         }
     }
@@ -179,12 +170,13 @@ public class MainActivity extends AppCompatActivity {
     private class ReceiverThread extends Thread {
 
         private boolean mTransmit = true;
+        private int mRemotePort = 0;
+
         private int mPacketCount = 0;
         private int mFirstPacketNumber = 0;
         private int mLostPackets = 0;
         private double mPacketLoss = 0.0;
-        private int mLastPacket = 0;
-        private int mRemotePort = 0;
+
         private byte[] mBuffer = new byte[Packet.MAX_LENGTH];
 
         @Override

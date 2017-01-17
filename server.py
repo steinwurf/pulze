@@ -12,7 +12,7 @@ PORT = 51423
 DEFAULT_SEND_INTERVAL = 1000
 DEFAULT_KEEP_ALIVE_INTERVAL = 100
 DEFAULT_PAYLOAD_SIZE = 0
-PACKET_FORMAT = "{packet:010d},{int_send_interval:05d},{keep_alive:05d},{payload}"
+PACKET_FORMAT = ">III{payload_size:d}s"
 
 
 def all_interfaces():
@@ -78,11 +78,9 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
                     time.sleep(sleeptime)
                 time_last = time_next
             packet += 1
-            data = PACKET_FORMAT.format(
-                packet=packet,
-                int_send_interval=int(send_interval),
-                keep_alive=client_keep_alive_interval,
-                payload=payload)
+            datafmt = PACKET_FORMAT.format(payload_size=payload_size)
+            data = struct.pack(datafmt, packet, int(send_interval),
+                               client_keep_alive_interval, payload)
 
             bytes_sent += len(data)
             send_rate = (bytes_sent * 8 / (time.time() - time_start)) / 10**6
@@ -93,10 +91,8 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
             if send_interval < 100.0 and packet % int(100.0/send_interval):
                 continue
 
-            sys.stdout.write("\rSent {}... with length {}. "
-                  "Data rate is {} Mbps".format(data[:26],
-                                                len(data),
-                                                send_rate))
+            sys.stdout.write("\rSent packet number {} with length {}. "
+                  "Data rate is {} Mbps".format(packet, len(data), send_rate))
             sys.stdout.flush()
 
     except KeyboardInterrupt:
