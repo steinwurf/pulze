@@ -184,8 +184,8 @@ public class MainActivity extends AppCompatActivity {
         private int mLostPackets = 0;
         private double mPacketLoss = 0.0;
         private int mLastPacket = 0;
-
         private int mRemotePort = 0;
+        private byte[] mBuffer = new byte[Packet.MAX_LENGTH];
 
         @Override
         public void run() {
@@ -198,8 +198,7 @@ public class MainActivity extends AppCompatActivity {
 
                 try {
                     while (mTransmit) {
-                        byte[] buffer = new byte[Packet.MAX_LENGTH];
-                        DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                        DatagramPacket packet = new DatagramPacket(mBuffer, mBuffer.length);
                         socket.receive(packet);
 
                         // If the port from which the packet was received is
@@ -210,7 +209,7 @@ public class MainActivity extends AppCompatActivity {
                             mFirstPacketNumber = 0;
                         }
 
-                        final Packet p = new Packet(buffer);
+                        final Packet p = new Packet(mBuffer);
                         if (!p.mValid) {
                             runOnUiThread(new Runnable() {
                                 @Override
