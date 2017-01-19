@@ -46,22 +46,24 @@ def format_ip(addr):
 
 
 def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
-             payload_size):
+             payload_size, use_broadcast):
     """Transmit data."""
-    print("Transmitting data every {send_interval}ms, "
-          "to port {port}".format(
-            port=port,
-            send_interval=send_interval))
+    print("Transmitting data every {send_interval}ms, ".format(
+        send_interval=send_interval))
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((interface_ip, 0))
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    # broadcast_ip = '.'.join(interface_ip.split('.')[:-1] + ['255'])
-    # print broadcast_ip
-    # address = (broadcast_ip, port)
-    mcaddress = "224.0.0.251"
-    address = (mcaddress, port)
+
+    broadcast_ip = '.'.join(interface_ip.split('.')[:-1] + ['255'])
+    address = (broadcast_ip, port)
+
+    if not use_broadcast:
+        mcaddress = "224.0.0.251"
+        address = (mcaddress, port)
+    print "Sending to endpoint", address
+
     payload = "X" * payload_size
 
     bytes_sent = 0
@@ -138,6 +140,11 @@ def main():
         type=int,
         default=DEFAULT_PAYLOAD_SIZE)
 
+    parser.add_argument(
+        '--use-broadcast',
+        help='Use a broadcast ip instead of multicast',
+        action='store_true'
+    )
 
     args = parser.parse_args()
     transmit(
@@ -145,7 +152,8 @@ def main():
         args.port,
         args.send_interval,
         args.keep_alive_interval,
-        args.payload_size)
+        args.payload_size,
+        args.use_broadcast)
 
 if __name__ == '__main__':
     main()
