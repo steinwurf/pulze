@@ -1,7 +1,6 @@
 """Pulze server sending multicast packets in a configurable interval."""
 import argparse
 import array
-import fcntl
 import socket
 import struct
 import time
@@ -30,6 +29,7 @@ WIFI_MODE_FULL_HIGH_PERF = 3
 
 def all_interfaces():
     """Return a list of all network interfaces."""
+    import fcntl
     max_possible = 128  # arbitrary. raise if needed.
     number_of_bytes = max_possible * 32
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -121,14 +121,24 @@ def main():
     """Main function."""
     parser = argparse.ArgumentParser()
 
-    interfaces = all_interfaces()
+    if sys.platform != 'win32':
 
-    parser.add_argument(
-        '--interface',
-        help='The network interface to use for the transmission.',
-        type=str,
-        choices=interfaces.keys(),
-        default='eth2')
+        interfaces = all_interfaces()
+
+        parser.add_argument(
+            '--interface',
+            help='The network interface to use for the transmission.',
+            type=str,
+            choices=interfaces.keys(),
+            default='eth2')
+
+    else:
+
+        parser.add_argument(
+            '--interface',
+            help='The IP of the network interface to use for transmission.',
+            type=str,
+            default='0.0.0.0')
 
     parser.add_argument(
         '--port',
@@ -186,8 +196,14 @@ def main():
         help="Set Android WiFi lock type to WIFI_MODE_FULL_HIGH_PERF")
 
     args = parser.parse_args()
+
+    if sys.platform != 'win32':
+        interface = interfaces[args.interface]
+    else:
+        interface = args.interface
+
     transmit(
-        interfaces[args.interface],
+        interface,
         args.port,
         args.send_interval,
         args.keep_alive_interval,

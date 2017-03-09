@@ -265,11 +265,12 @@ public class MainActivity extends AppCompatActivity {
                         // Update wifi sleep policy
                         if (p.mWifiSleepPolicy != mWifiSleepPolicy) {
                             mWifiSleepPolicy = p.mWifiSleepPolicy;
-                            // @FIXME This is not the correct way to do it - app crashes on lower android versions.
-                            //Settings.Global.putInt(
-                            //        getContentResolver(),
-                            //        Settings.Global.WIFI_SLEEP_POLICY,
-                            //        mWifiSleepPolicy);
+
+                            Settings.System.putInt(
+                                    getContentResolver(),
+                                    Settings.System.WIFI_SLEEP_POLICY,
+                                    mWifiSleepPolicy);
+
                         }
 
                         // Update wifi lock type
