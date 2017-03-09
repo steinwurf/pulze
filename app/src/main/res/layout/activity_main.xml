@@ -109,6 +109,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:text="0"
                 android:id="@+id/last_packet"
                 android:textColor="#ffffff"
                 android:textStyle="bold"
@@ -133,6 +134,54 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:id="@+id/keep_alive"
+                android:textColor="#ffffff"
+                android:textStyle="bold"
+                android:textSize="30dp" />
+        </LinearLayout>
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_centerHorizontal="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="WiFi Sleep Policy: "
+                android:textColor="#ffffff"
+                android:textStyle="bold"
+                android:textSize="30dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:id="@+id/wifi_sleep_policy"
+                android:textColor="#ffffff"
+                android:textStyle="bold"
+                android:textSize="30dp" />
+        </LinearLayout>
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_centerHorizontal="true">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="WiFi Lock Type: "
+                android:textColor="#ffffff"
+                android:textStyle="bold"
+                android:textSize="30dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="0"
+                android:id="@+id/wifi_lock_type"
                 android:textColor="#ffffff"
                 android:textStyle="bold"
                 android:textSize="30dp" />

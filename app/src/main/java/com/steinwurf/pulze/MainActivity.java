@@ -8,6 +8,7 @@ import android.net.DhcpInfo;
 import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Handler;
+import android.provider.Settings;
 import android.support.annotation.FloatRange;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -35,6 +36,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     RelativeLayout mScreen;
     WifiManager mWifi;
+    WifiManager.WifiLock mWifiLock;
     private ReceiverThread mReceiverThread;
     private KeepAliveThread mKeepAliveThread;
     private TextView mLastPacketText;
@@ -42,6 +44,8 @@ public class MainActivity extends AppCompatActivity {
     private TextView mPacketLossText;
     private TextView mPacketCountText;
     private TextView mKeepAliveText;
+    private TextView mWifiSleepPolicyText;
+    private TextView mWifiLockTypeText;
     private ObjectAnimator mColorFade;
     private Thread mFadeThread;
 
@@ -52,12 +56,15 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         mScreen = (RelativeLayout)findViewById(R.id.screen);
         mScreen.setBackgroundColor(Color.rgb(255, 0, 0));
-        mWifi = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        mWifi = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        mWifiLock = mWifi.createWifiLock(TAG);
         mLastPacketText = (TextView)findViewById(R.id.last_packet);
         mLostPacketsText = (TextView)findViewById(R.id.lost_packets);
         mPacketLossText = (TextView)findViewById(R.id.packet_loss);
         mPacketCountText = (TextView)findViewById(R.id.packet_count);
         mKeepAliveText = (TextView)findViewById(R.id.keep_alive);
+        mWifiSleepPolicyText = (TextView)findViewById(R.id.wifi_sleep_policy);
+        mWifiLockTypeText = (TextView)findViewById(R.id.wifi_lock_type);
 
         if (mWifi != null){
             WifiManager.MulticastLock lock = mWifi.createMulticastLock("mylock");
@@ -149,6 +156,8 @@ public class MainActivity extends AppCompatActivity {
         public int mPacketNumber;
         public int mSendInterval;
         public int mKeepAliveInterval;
+        public int mWifiSleepPolicy;
+        public int mWifiLockType;
 
         Packet(byte[] buffer)
         {
@@ -158,6 +167,9 @@ public class MainActivity extends AppCompatActivity {
                 mPacketNumber = wrapped.getInt(0);
                 mSendInterval = wrapped.getInt(4);
                 mKeepAliveInterval = wrapped.getInt(8);
+                mWifiSleepPolicy = wrapped.getInt(12);
+                mWifiLockType = wrapped.getInt(16);
+
             } catch (IndexOutOfBoundsException e) {
                 e.printStackTrace();
                 return;
@@ -174,10 +186,16 @@ public class MainActivity extends AppCompatActivity {
 
         private int mPacketCount = 0;
         private int mFirstPacketNumber = 0;
+        private int mLastPacketNumber = 0;
         private int mLostPackets = 0;
         private double mPacketLoss = 0.0;
 
         private byte[] mBuffer = new byte[Packet.MAX_LENGTH];
+
+        // Initialize SleepPolicy and WifiLock to bogus values, forcing the first packet to set
+        // SleepPolicy and LockType
+        private int mWifiSleepPolicy = -1;
+        private int mWifiLockType = -1;
 
         @Override
         public void run() {
@@ -242,17 +260,48 @@ public class MainActivity extends AppCompatActivity {
                                     packet.getAddress().getHostAddress(), p.mKeepAliveInterval);
                             mKeepAliveThread.start();
                         }
+                        // End of handle keep alive
 
+                        // Update wifi sleep policy
+                        if (p.mWifiSleepPolicy != mWifiSleepPolicy) {
+                            mWifiSleepPolicy = p.mWifiSleepPolicy;
+                            // @FIXME This is not the correct way to do it - app crashes on lower android versions.
+                            //Settings.Global.putInt(
+                            //        getContentResolver(),
+                            //        Settings.Global.WIFI_SLEEP_POLICY,
+                            //        mWifiSleepPolicy);
+                        }
+
+                        // Update wifi lock type
+                        if (p.mWifiLockType != mWifiLockType) {
+                            mWifiLockType = p.mWifiLockType;
+                            if (mWifiLock.isHeld()) {
+                                mWifiLock.release();
+                            }
+                            mWifiLock = mWifi.createWifiLock(mWifiLockType, TAG);
+                            mWifiLock.acquire();
+                        }
+
+                        // Calculate packet loss
                         if (mPacketCount == 0) {
                             mFirstPacketNumber = p.mPacketNumber;
                         }
 
+                        if (p.mPacketNumber < mFirstPacketNumber) {
+                            mFirstPacketNumber = p.mPacketNumber;
+                        }
+
+                        if (p.mPacketNumber > mLastPacketNumber) {
+                            mLastPacketNumber = p.mPacketNumber;
+                        }
+
                         mPacketCount += 1;
 
-                        mLostPackets = (1 + p.mPacketNumber -
-                                        mFirstPacketNumber) - mPacketCount;
+                        int span = 1 + mLastPacketNumber - mFirstPacketNumber;
 
-                        mPacketLoss = (double) mLostPackets / (double) p.mPacketNumber * 100.0;
+                        mLostPackets = span - mPacketCount;
+
+                        mPacketLoss = (double) mLostPackets / (double) span  * 100.0;
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
@@ -264,10 +313,12 @@ public class MainActivity extends AppCompatActivity {
                                 }
 
                                 resetAnimation(displayInterval);
-                                mLastPacketText.setText("" + p.mPacketNumber);
+                                mLastPacketText.setText("" + mLastPacketNumber);
                                 mPacketCountText.setText("" + mPacketCount);
                                 mLostPacketsText.setText("" + mLostPackets);
                                 mPacketLossText.setText(String.format("%.2f", mPacketLoss) + " %");
+                                mWifiSleepPolicyText.setText("" + mWifiSleepPolicy);
+                                mWifiLockTypeText.setText("" + mWifiLockType);
                             }
                         });
                     }
