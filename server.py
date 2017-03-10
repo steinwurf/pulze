@@ -1,7 +1,6 @@
 """Pulze server sending multicast packets in a configurable interval."""
 import argparse
 import array
-import fcntl
 import socket
 import struct
 import time
@@ -12,11 +11,25 @@ PORT = 51423
 DEFAULT_SEND_INTERVAL = 1000
 DEFAULT_KEEP_ALIVE_INTERVAL = 100
 DEFAULT_PAYLOAD_SIZE = 0
-PACKET_FORMAT = ">III{payload_size:d}s"
+# Packet format: packet number, send interval [ms], keep alive interval [ms], WIFI sleep policy, WIFI lock type, payload
+PACKET_FORMAT = ">IIIII{payload_size:d}s"
+
+# Android wifi policy:
+# https://developer.android.com/reference/android/provider/Settings.Global.html#WIFI_SLEEP_POLICY
+WIFI_SLEEP_POLICY_DEFAULT = 0 # Default after turning off
+WIFI_SLEEP_POLICY_NEVER = 2 # Never sleep
+WIFI_SLEEP_POLICY_NEVER_WHILE_PLUGGED = 1 # Never sleep while plugged in
+
+# Android wifi lock type:
+# https://developer.android.com/reference/android/net/wifi/WifiManager.html#WIFI_MODE_FULL
+WIFI_MODE_NONE = 0 # No lock
+WIFI_MODE_FULL = 1
+WIFI_MODE_FULL_HIGH_PERF = 3
 
 
 def all_interfaces():
     """Return a list of all network interfaces."""
+    import fcntl
     max_possible = 128  # arbitrary. raise if needed.
     number_of_bytes = max_possible * 32
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -46,7 +59,7 @@ def format_ip(addr):
 
 
 def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
-             payload_size, use_broadcast):
+             payload_size, use_broadcast, wifi_sleep_policy, wifi_lock_type):
     """Transmit data."""
     print("Transmitting data every {send_interval}ms, ".format(
         send_interval=send_interval))
@@ -82,7 +95,8 @@ def transmit(interface_ip, port, send_interval, client_keep_alive_interval,
             packet += 1
             datafmt = PACKET_FORMAT.format(payload_size=payload_size)
             data = struct.pack(datafmt, packet, int(send_interval),
-                               client_keep_alive_interval, payload)
+                               client_keep_alive_interval, wifi_sleep_policy,
+                               wifi_lock_type, payload)
 
             bytes_sent += len(data)
             send_rate = (bytes_sent * 8 / (time.time() - time_start)) / 10**6
@@ -107,14 +121,24 @@ def main():
     """Main function."""
     parser = argparse.ArgumentParser()
 
-    interfaces = all_interfaces()
+    if sys.platform != 'win32':
 
-    parser.add_argument(
-        '--interface',
-        help='The network interface to use for the transmission.',
-        type=str,
-        choices=interfaces.keys(),
-        default='eth2')
+        interfaces = all_interfaces()
+
+        parser.add_argument(
+            '--interface',
+            help='The network interface to use for the transmission.',
+            type=str,
+            choices=interfaces.keys(),
+            default='eth2')
+
+    else:
+
+        parser.add_argument(
+            '--interface',
+            help='The IP of the network interface to use for transmission.',
+            type=str,
+            default='0.0.0.0')
 
     parser.add_argument(
         '--port',
@@ -146,14 +170,47 @@ def main():
         action='store_true'
     )
 
+    wifi_sleep_policy = parser.add_mutually_exclusive_group()
+    wifi_sleep_policy.add_argument('--wifi-sleep-policy-never',
+        dest='wifi_sleep_policy',
+        action='store_const', const=WIFI_SLEEP_POLICY_NEVER,
+        default=WIFI_SLEEP_POLICY_DEFAULT,
+        help='Set Android WiFi sleep policy to WIFI_SLEEP_POLICY_NEVER')
+    wifi_sleep_policy.add_argument('--wifi-sleep-policy-never-while-plugged',
+        dest='wifi_sleep_policy',
+        action='store_const', const=WIFI_SLEEP_POLICY_NEVER_WHILE_PLUGGED,
+        default=WIFI_SLEEP_POLICY_DEFAULT,
+        help="Set Android WiFi sleep policy "
+             "to WIFI_SLEEP_POLICY_NEVER_WHILE_PLUGGED")
+
+    wifi_lock_type = parser.add_mutually_exclusive_group()
+    wifi_lock_type.add_argument('--wifi-mode-full',
+        dest='wifi_lock_type',
+        action='store_const', const=WIFI_MODE_FULL,
+        default=WIFI_MODE_NONE,
+        help="Set Android WiFi lock type to WIFI_MODE_FULL")
+    wifi_lock_type.add_argument('--wifi-mode-full-high-perf',
+        dest='wifi_lock_type',
+        action='store_const', const=WIFI_MODE_FULL_HIGH_PERF,
+        default=WIFI_MODE_NONE,
+        help="Set Android WiFi lock type to WIFI_MODE_FULL_HIGH_PERF")
+
     args = parser.parse_args()
+
+    if sys.platform != 'win32':
+        interface = interfaces[args.interface]
+    else:
+        interface = args.interface
+
     transmit(
-        interfaces[args.interface],
+        interface,
         args.port,
         args.send_interval,
         args.keep_alive_interval,
         args.payload_size,
-        args.use_broadcast)
+        args.use_broadcast,
+        args.wifi_sleep_policy,
+        args.wifi_lock_type)
 
 if __name__ == '__main__':
     main()
